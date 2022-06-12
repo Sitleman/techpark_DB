@@ -58,7 +58,12 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.storage.GetUser(nickname)
 	if err != nil {
+		resp := &entity.Error{
+			Message: ErrNoUser + nickname,
+		}
+		errorBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
+		w.Write(errorBytes)
 		return
 	}
 
@@ -83,9 +88,35 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := h.storage.GetUser(nickname)
+	if err != nil {
+		resp := &entity.Error{
+			Message: ErrNoUser + nickname,
+		}
+		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(respBytes)
+		return
+	}
+
+	if userReq.Fullname == "" {
+		userReq.Fullname = user.Fullname
+	}
+	if userReq.About == "" {
+		userReq.About = user.About
+	}
+	if userReq.Email == "" {
+		userReq.Email = user.Email
+	}
+
 	users, err := h.storage.FindUser(nickname, userReq.Email)
 	if err == nil && len(*users) > 1 {
+		resp := &entity.Error{
+			Message: ErrEmailAlreadyRegistered + nickname,
+		}
+		respBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusConflict)
+		w.Write(respBytes)
 		return
 	}
 
@@ -94,7 +125,7 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &entity.User{
+	user = &entity.User{
 		Nickname: nickname,
 		Fullname: userReq.Fullname,
 		About:    userReq.About,

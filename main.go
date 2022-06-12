@@ -19,17 +19,17 @@ func main() {
 
 	psqlStorage := psql.NewStorage(db)
 
-	handler := handler.NewNotesHandler(psqlStorage)
+	handler := handler.NewHandler(psqlStorage)
 
 	router := mux.NewRouter()
 	routerAPI := router.PathPrefix("/api").Subrouter()
 
 	/*====================== FORUM ======================*/
 	routerAPI.HandleFunc("/forum/create", handler.ForumCreate).Methods("POST")
-	routerAPI.HandleFunc("/forum/{slug:[a-z0-9-.]+}/details", handler.ForumDetails).Methods("GET")
-	routerAPI.HandleFunc("/forum/{slug:[a-z0-9-.]+}/create", handler.ForumCreateThread).Methods("POST")
-	routerAPI.HandleFunc("/forum/{slug:[a-z0-9-.]+}/users", handler.ForumUsers).Methods("GET")
-	routerAPI.HandleFunc("/forum/{slug:[a-z0-9-.]+}/threads", handler.ForumThreads).Methods("GET")
+	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/details", handler.ForumDetails).Methods("GET")
+	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/create", handler.ForumCreateThread).Methods("POST")
+	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/users", handler.ForumUsers).Methods("GET")
+	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/threads", handler.ForumThreads).Methods("GET")
 
 	/*====================== USER ======================*/
 	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9.]+}/create", handler.UserCreate).Methods("POST")

@@ -3,13 +3,12 @@ package psql
 import (
 	"strconv"
 	"techpark_db/internal/domain/entity"
-	"techpark_db/internal/utils"
 )
 
-const querySaveThread = "INSERT INTO Thread(Title, Author, Message, Forum, Slug, Created) VALUES ($1, $2, $3, $4, $5, now())"
+const querySaveThread = "INSERT INTO Thread(Title, Author, Message, Forum, Slug, Created) VALUES ($1, $2, $3, $4, $5, $6::TIMESTAMP WITH TIME ZONE)"
 
 func (store *Storage) SaveThread(thread entity.CreateThread, slugForum string) error {
-	if _, err := store.DB.Exec(querySaveThread, thread.Title, thread.Author, thread.Message, slugForum, utils.RandSlug()); err != nil {
+	if _, err := store.DB.Exec(querySaveThread, thread.Title, thread.Author, thread.Message, slugForum, thread.Slug, thread.Created); err != nil {
 		return err
 	}
 	return nil
@@ -28,6 +27,7 @@ func (store *Storage) GetThread(slugOrId string) (*entity.Thread, error) {
 		return nil, err
 	}
 	return &thread, nil
+
 }
 
 const queryGetThreadByTitle = "SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread WHERE Title = $1"

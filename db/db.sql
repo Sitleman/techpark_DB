@@ -2,7 +2,7 @@ CREATE TABLE Users
 (
     Nickname    varchar(100)    NOT NULL PRIMARY KEY,
     Fullname    varchar(100)      NOT NULL,
-    About       varchar(1000)      NOT NULL,
+    About       text      NOT NULL,
     Email       varchar(100)      NOT NULL
 );
 
@@ -24,8 +24,8 @@ CREATE TABLE Thread
     Title        varchar(100)      NOT NULL,
     Author       varchar(100)      NOT NULL REFERENCES Users(Nickname) ON DELETE CASCADE,
     Forum        varchar(100)      NOT NULL REFERENCES Forum(Slug) ON DELETE CASCADE,
-    Message      varchar(1000)      NOT NULL,
+    Message      text      NOT NULL,
     Votes        int               NOT NULL DEFAULT 0,
-    Slug         varchar(100)      NOT NULL,
-    Created      timestamp         NOT NULL
+    Slug         varchar(100)      ,
+    Created      timestamp WITH TIME ZONE NOT NULL
 );
