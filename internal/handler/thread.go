@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 	"techpark_db/internal/domain/entity"
@@ -24,8 +25,16 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, err := h.storage.GetThread(slug_or_id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thread, err := h.storage.GetThread(tx, slug_or_id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
@@ -35,47 +44,73 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, post := range postReq {
-		if _, err := h.storage.GetUser(post.Author); err != nil {
-			resp := &entity.Error{
-				Message: ErrNoPostAuthor + post.Author,
-			}
-			respBytes, _ := json.Marshal(resp)
-			w.WriteHeader(http.StatusNotFound)
-			w.Write(respBytes)
+	if len(postReq) == 0 {
+		tx.Rollback()
+		postsBytes, _ := json.Marshal(postReq)
+		w.WriteHeader(http.StatusCreated)
+		w.Write(postsBytes)
+		return
+	}
+
+	if _, err := h.storage.GetUser(tx, postReq[0].Author); err != nil {
+		tx.Rollback()
+		resp := &entity.Error{
+			Message: ErrNoPostAuthor + postReq[0].Author,
+		}
+		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(respBytes)
+		return
+	}
+
+	if postReq[0].Parent != 0 {
+		ok, err := h.storage.CheckParentPost(tx, postReq[0].Parent, thread.Id)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		if post.Parent != 0 {
-			ok, err := h.storage.CheckParentPost(post.Parent, thread.Id)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+		if !ok {
+			tx.Rollback()
+			resp := &entity.Error{
+				Message: ErrNoThread + slug_or_id,
 			}
-			if !ok {
-				resp := &entity.Error{
-					Message: ErrNoThread + slug_or_id,
-				}
-				respBytes, _ := json.Marshal(resp)
-				w.WriteHeader(http.StatusConflict)
-				w.Write(respBytes)
-				return
-			}
+			respBytes, _ := json.Marshal(resp)
+			w.WriteHeader(http.StatusConflict)
+			w.Write(respBytes)
+			return
 		}
 	}
 
 	created := time.Now().Format(time.RFC3339Nano)
+	created = created[:len(created)-4]
 
-	if err := h.storage.SavePosts(postReq, thread.Forum, thread.Id, created); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	posts, err := h.storage.GetPostsByCreated(created)
+	ids, err := h.storage.SavePosts(tx, postReq, thread.Forum, thread.Id, created)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	posts := make([]entity.Post, len(*ids))
+	for i := 0; i < len(*ids); i++ {
+		posts[i] = entity.Post{
+			Id:       (*ids)[i],
+			Parent:   postReq[i].Parent,
+			Author:   postReq[i].Author,
+			Message:  postReq[i].Message,
+			Created:  created,
+			IsEdited: false,
+			Forum:    thread.Forum,
+			Thread:   thread.Id,
+		}
+	}
+
 	postsBytes, _ := json.Marshal(posts)
 	w.WriteHeader(http.StatusCreated)
 	w.Write(postsBytes)
@@ -96,8 +131,16 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, err := h.storage.GetThread(slug_or_id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thread, err := h.storage.GetThread(tx, slug_or_id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
@@ -106,8 +149,9 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 		w.Write(respBytes)
 		return
 	}
+	voteReq.IdThread = thread.Id
 
-	user, err := h.storage.GetUser(voteReq.Nickname)
+	user, err := h.storage.GetUser(tx, voteReq.Nickname)
 	if err != nil {
 		resp := &entity.Error{
 			Message: ErrNoUser + voteReq.Nickname,
@@ -119,19 +163,24 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 	}
 	voteReq.Nickname = user.Nickname
 
-	voteReq.IdThread = thread.Id
-	voteReq.SlugThread = thread.Slug
-
-	vote, err := h.storage.GetVote(voteReq.IdThread, voteReq.Nickname)
+	err = h.storage.SetVote(tx, voteReq)
 	if err != nil {
-		h.storage.SaveVote(voteReq)
-		thread.Votes += voteReq.Voice
-	} else {
-		h.storage.UpdateVote(voteReq)
-		thread.Votes += voteReq.Voice - vote.Voice
+		tx.Rollback()
+		w.WriteHeader(http.StatusConflict)
+		return
 	}
 
-	if err := h.storage.UpdateThreadVote(*thread); err != nil {
+	voteCount, err := h.storage.CountVote(tx, thread.Id)
+	if err != nil {
+		tx.Rollback()
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	thread.Votes = *voteCount
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -150,14 +199,28 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, err := h.storage.GetThread(slug_or_id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thread, err := h.storage.GetThread(tx, slug_or_id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
 		respBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -181,8 +244,16 @@ func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, err := h.storage.GetThread(slug_or_id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thread, err := h.storage.GetThread(tx, slug_or_id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
@@ -199,7 +270,13 @@ func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
 		thread.Message = threadReq.Message
 	}
 
-	if err := h.storage.UpdateThread(*thread); err != nil {
+	if err := h.storage.UpdateThread(tx, *thread); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -235,8 +312,16 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		order = "DESC"
 	}
 
-	thread, err := h.storage.GetThread(slug_or_id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thread, err := h.storage.GetThread(tx, slug_or_id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
@@ -249,14 +334,20 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 	var posts *[]entity.Post
 	switch sort {
 	case "flat":
-		posts, err = h.storage.GetPostsByThreadFlat(thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsByThreadFlat(tx, thread.Id, limit, since, sort, order)
 	case "tree":
-		posts, err = h.storage.GetPostsTree(thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsTree(tx, thread.Id, limit, since, sort, order)
 	case "parent_tree":
-		posts, err = h.storage.GetPostsParentTree(thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsParentTree(tx, thread.Id, limit, since, sort, order)
 	}
 
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -265,3 +356,33 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(postsBytes)
 }
+
+//
+//user, err := h.storage.GetUser(voteReq.Nickname)
+//if err != nil {
+//	resp := &entity.Error{
+//		Message: ErrNoUser + voteReq.Nickname,
+//	}
+//	respBytes, _ := json.Marshal(resp)
+//	w.WriteHeader(http.StatusNotFound)
+//	w.Write(respBytes)
+//	return
+//}
+//voteReq.Nickname = user.Nickname
+//
+//voteReq.IdThread = thread.Id
+//voteReq.SlugThread = thread.Slug
+//
+//vote, err := h.storage.GetVote(voteReq.IdThread, voteReq.Nickname)
+//if err != nil {
+//	h.storage.SaveVote(voteReq)
+//	thread.Votes += voteReq.Voice
+//} else {
+//	h.storage.UpdateVote(voteReq)
+//	thread.Votes += voteReq.Voice - vote.Voice
+//}
+//
+//if err := h.storage.UpdateThreadVote(*thread); err != nil {
+//	w.WriteHeader(http.StatusInternalServerError)
+//	return
+//}

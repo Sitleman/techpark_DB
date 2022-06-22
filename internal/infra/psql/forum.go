@@ -8,17 +8,17 @@ import (
 
 const querySaveForum = "INSERT INTO Forum(Slug, Title, Nickname) VALUES ($1, $2, $3)"
 
-func (store *Storage) SaveForum(forum entity.CreateForum) error {
-	if _, err := store.DB.Exec(querySaveForum, forum.Slug, forum.Title, forum.User); err != nil {
+func (store *Storage) SaveForum(tx *sql.Tx, forum entity.CreateForum) error {
+	if _, err := tx.Exec(querySaveForum, forum.Slug, forum.Title, forum.User); err != nil {
 		return err
 	}
 	return nil
 }
 
-const queryGetForum = "SELECT Slug, Title, Nickname, Posts, Threads FROM Forum WHERE LOWER(Slug) = LOWER($1)"
+const queryGetForum = "SELECT Slug, Title, Nickname, Posts, Threads FROM Forum WHERE Slug = $1"
 
-func (store *Storage) GetForum(slug string) (*entity.Forum, error) {
-	row := store.DB.QueryRow(queryGetForum, slug)
+func (store *Storage) GetForum(tx *sql.Tx, slug string) (*entity.Forum, error) {
+	row := tx.QueryRow(queryGetForum, slug)
 	forum := entity.Forum{}
 	if err := row.Scan(&forum.Slug, &forum.Title, &forum.User, &forum.Posts, &forum.Threads); err != nil {
 		//log.Info(err, "[slug: ", slug, "]")
@@ -29,25 +29,25 @@ func (store *Storage) GetForum(slug string) (*entity.Forum, error) {
 
 const queryGetForumThreads = `
 SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread
-WHERE LOWER(Forum) = LOWER($1) AND Created >= $2::TIMESTAMP WITH TIME ZONE
+WHERE Forum = $1 AND Created >= $2::TIMESTAMP WITH TIME ZONE
 ORDER BY Created 
 LIMIT $3
 `
 
 const queryGetForumThreadsDesc = `
 SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread
-WHERE LOWER(Forum) = LOWER($1) AND Created <= $2::TIMESTAMP WITH TIME ZONE
+WHERE Forum = $1 AND Created <= $2::TIMESTAMP WITH TIME ZONE
 ORDER BY Created DESC
 LIMIT $3
 `
 
-func (store *Storage) GetForumThreads(slug string, order string, limit int, since string) (*[]entity.Thread, error) {
+func (store *Storage) GetForumThreads(tx *sql.Tx, slug string, order string, limit int, since string) (*[]entity.Thread, error) {
 	var rows *sql.Rows
 	var err error
 	if order == "ASC" {
-		rows, err = store.DB.Query(queryGetForumThreads, slug, since, limit)
+		rows, err = tx.Query(queryGetForumThreads, slug, since, limit)
 	} else {
-		rows, err = store.DB.Query(queryGetForumThreadsDesc, slug, since, limit)
+		rows, err = tx.Query(queryGetForumThreadsDesc, slug, since, limit)
 	}
 
 	if err != nil {
@@ -74,63 +74,63 @@ func (store *Storage) GetForumThreads(slug string, order string, limit int, sinc
 }
 
 const queryGetForumUsers = `
-SELECT Nickname, Fullname, About, Email FROM Users
-WHERE Nickname IN (
-    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+SELECT Nickname, Fullname, About, Email FROM Users AS u
+WHERE EXISTS (
+    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
     UNION
-    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
-    )
-ORDER BY LOWER(Nickname)
+    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
+)
+ORDER BY Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersDesc = `
-SELECT Nickname, Fullname, About, Email FROM Users
-WHERE Nickname IN (
-    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+SELECT Nickname, Fullname, About, Email FROM Users AS u
+WHERE EXISTS (
+    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
     UNION
-    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
-    )
-ORDER BY LOWER(Nickname) DESC
+    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
+)
+ORDER BY Nickname DESC
 LIMIT $2
 `
 
 const queryGetForumUsersSince = `
-SELECT Nickname, Fullname, About, Email FROM Users
-WHERE Nickname IN (
-    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+SELECT Nickname, Fullname, About, Email FROM Users AS u
+WHERE EXISTS (
+    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
     UNION
-    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
-    ) AND LOWER(Nickname) > LOWER($3)
-ORDER BY LOWER(Nickname)
+    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
+) AND Nickname > $3
+ORDER BY Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersSinceDesc = `
-SELECT Nickname, Fullname, About, Email FROM Users
-WHERE Nickname IN (
-    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+SELECT Nickname, Fullname, About, Email FROM Users AS u
+WHERE EXISTS (
+    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
     UNION
-    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
-    ) AND LOWER(Nickname) < LOWER($3)
-ORDER BY LOWER(Nickname) DESC
+    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
+) AND Nickname < $3
+ORDER BY Nickname DESC
 LIMIT $2
 `
 
-func (store *Storage) GetForumUsers(slug string, order string, limit int, since string) (*[]entity.User, error) {
+func (store *Storage) GetForumUsers(tx *sql.Tx, slug string, order string, limit int, since string) (*[]entity.User, error) {
 	var rows *sql.Rows
 	var err error
 	if since == "" {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetForumUsers, slug, limit)
+			rows, err = tx.Query(queryGetForumUsers, slug, limit)
 		} else {
-			rows, err = store.DB.Query(queryGetForumUsersDesc, slug, limit)
+			rows, err = tx.Query(queryGetForumUsersDesc, slug, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetForumUsersSince, slug, limit, since)
+			rows, err = tx.Query(queryGetForumUsersSince, slug, limit, since)
 		} else {
-			rows, err = store.DB.Query(queryGetForumUsersSinceDesc, slug, limit, since)
+			rows, err = tx.Query(queryGetForumUsersSinceDesc, slug, limit, since)
 		}
 	}
 

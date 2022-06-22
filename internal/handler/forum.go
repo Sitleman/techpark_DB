@@ -18,8 +18,16 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.storage.GetUser(forumRequest.User)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.storage.GetUser(tx, forumRequest.User)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoUser + forumRequest.User,
 		}
@@ -30,15 +38,17 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	forumRequest.User = user.Nickname
 
-	forum, err := h.storage.GetForum(forumRequest.Slug)
+	forum, err := h.storage.GetForum(tx, forumRequest.Slug)
 	if err == nil {
+		tx.Rollback()
 		forumBytes, _ := json.Marshal(forum)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(forumBytes)
 		return
 	}
 
-	if err := h.storage.SaveForum(forumRequest); err != nil {
+	if err := h.storage.SaveForum(tx, forumRequest); err != nil {
+		tx.Rollback()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -49,6 +59,12 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 		User:    forumRequest.User,
 		Posts:   0,
 		Threads: 0,
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	forumBytes, _ := json.Marshal(forum)
@@ -65,14 +81,28 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forum, err := h.storage.GetForum(slug)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	forum, err := h.storage.GetForum(tx, slug)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoForum + slug,
 		}
 		respBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -96,7 +126,15 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.storage.GetUser(threadRequest.Author); err != nil {
+	tx, err := h.storage.DB.Begin()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := h.storage.GetUser(tx, threadRequest.Author); err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThreadAuthor + threadRequest.Author,
 		}
@@ -106,16 +144,18 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, err := h.storage.GetThread(threadRequest.Slug)
+	thread, err := h.storage.GetThread(tx, threadRequest.Slug)
 	if err == nil {
+		tx.Rollback()
 		threadBytes, _ := json.Marshal(thread)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(threadBytes)
 		return
 	}
 
-	forum, err := h.storage.GetForum(slugForum)
+	forum, err := h.storage.GetForum(tx, slugForum)
 	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThreadForum + slugForum,
 		}
@@ -129,17 +169,26 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		threadRequest.Created = time.Now().Format(time.RFC3339Nano)
 	}
 
-	insertId, err := h.storage.SaveThread(threadRequest, forum.Slug)
+	insertId, err := h.storage.SaveThread(tx, threadRequest, forum.Slug)
 	if err != nil {
+		tx.Rollback()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	thread, err = h.storage.GetThreadById(insertId)
+	thread, err = h.storage.GetThreadById(tx, insertId)
 	if err != nil {
+		tx.Rollback()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	threadBytes, _ := json.Marshal(thread)
 	w.WriteHeader(http.StatusCreated)
 	w.Write(threadBytes)
@@ -164,7 +213,15 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		order = "DESC"
 	}
 
-	if _, err := h.storage.GetForum(slug); err != nil {
+	tx, err := h.storage.DB.Begin()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := h.storage.GetForum(tx, slug); err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoForum + slug,
 		}
@@ -174,10 +231,17 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.storage.GetForumUsers(slug, order, limit, since)
+	users, err := h.storage.GetForumUsers(tx, slug, order, limit, since)
 	if err != nil {
+		tx.Rollback()
 		log.Warning("trouble GetForumUsers")
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -209,7 +273,15 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		since = r.FormValue("since")
 	}
 
-	if _, err := h.storage.GetForum(slug); err != nil {
+	tx, err := h.storage.DB.Begin()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := h.storage.GetForum(tx, slug); err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoForum + slug,
 		}
@@ -219,8 +291,15 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forum, err := h.storage.GetForumThreads(slug, order, limit, since)
+	forum, err := h.storage.GetForumThreads(tx, slug, order, limit, since)
 	if err != nil {
+		tx.Rollback()
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

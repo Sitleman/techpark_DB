@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,9 +23,17 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 	args := strings.Split(argsRaw, ",")
 	//log.Info(args, "///", argsRaw, "///")
 
-	id, _ := strconv.Atoi(idRaw)
-	post, err := h.storage.GetPostById(id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	id, _ := strconv.Atoi(idRaw)
+	post, err := h.storage.GetPostById(tx, id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoPost + idRaw,
 		}
@@ -40,27 +49,36 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 	for _, arg := range args {
 		switch arg {
 		case "user":
-			author, err := h.storage.GetUser(post.Author)
+			author, err := h.storage.GetUser(tx, post.Author)
 			if err != nil {
+				tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			postDetails.DAuthor = author
 		case "forum":
-			forum, err := h.storage.GetForum(post.Forum)
+			forum, err := h.storage.GetForum(tx, post.Forum)
 			if err != nil {
+				tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			postDetails.DForum = forum
 		case "thread":
-			thread, err := h.storage.GetThreadById(post.Thread)
+			thread, err := h.storage.GetThreadById(tx, post.Thread)
 			if err != nil {
+				tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			postDetails.DThread = thread
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	postDetailsBytes, _ := json.Marshal(postDetails)
@@ -85,8 +103,16 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := h.storage.GetPostById(id)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	post, err := h.storage.GetPostById(tx, id)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoPost + idRaw,
 		}
@@ -113,13 +139,20 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.storage.UpdatePost(id, postRequest.Message); err != nil {
+	if err := h.storage.UpdatePost(tx, id, postRequest.Message); err != nil {
+		tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	post.Message = postRequest.Message
 	post.IsEdited = true
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	postBytes, _ := json.Marshal(post)
 	w.WriteHeader(http.StatusOK)

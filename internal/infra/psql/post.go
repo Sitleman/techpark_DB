@@ -3,14 +3,15 @@ package psql
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"techpark_db/internal/domain/entity"
 )
 
 const queryCheckParentPost = "SELECT count(Id) FROM Posts WHERE Id = $1 AND Thread = $2"
 
-func (store *Storage) CheckParentPost(parent int, threadId int) (bool, error) {
-	row := store.DB.QueryRow(queryCheckParentPost, parent, threadId)
+func (store *Storage) CheckParentPost(tx *sql.Tx, parent int, threadId int) (bool, error) {
+	row := tx.QueryRow(queryCheckParentPost, parent, threadId)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return false, err
@@ -21,57 +22,71 @@ func (store *Storage) CheckParentPost(parent int, threadId int) (bool, error) {
 	return true, nil
 }
 
-const querySavePost = "INSERT INTO Posts(Parent, Author, Message, Forum, Thread, Created) VALUES ($1, $2, $3, $4, $5, $6)"
+const querySavePost = "INSERT INTO Posts(Parent, Author, Message, Forum, Thread, Created) VALUES "
 
-func (store *Storage) SavePosts(posts []entity.CreatePost, forum string, thread int, created string) error {
-	tx, err := store.DB.Begin()
-	if err != nil {
-		return err
+func (store *Storage) SavePosts(tx *sql.Tx, posts []entity.CreatePost, forum string, thread int, created string) (*[]int, error) {
+	query := querySavePost
+	args := make([]interface{}, 0, len(posts))
+	for i, post := range posts {
+		query += fmt.Sprintf(" ($%d, $%d, $%d, $%d, $%d, $%d),", i*6+1, i*6+2, i*6+3, i*6+4, i*6+5, i*6+6)
+		args = append(args, post.Parent, post.Author, post.Message, forum, thread, created)
 	}
+	query = query[:len(query)-1]
+	query += " RETURNING Id"
 
-	for _, post := range posts {
-		_, err := tx.Exec(querySavePost, post.Parent, post.Author, post.Message, forum, thread, created)
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	tx.Commit()
-	return nil
-}
-
-const queryGetPosts = "SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts WHERE Created = $1::TIMESTAMP WITH TIME ZONE ORDER BY Id"
-
-func (store *Storage) GetPostsByCreated(created string) (*[]entity.Post, error) {
-	rows, err := store.DB.Query(queryGetPosts, created)
+	rows, err := tx.Query(query, args...)
 	if err != nil {
-		log.Error(err, "[created ", created, "]")
 		return nil, err
 	}
 	defer rows.Close()
 
-	posts := make([]entity.Post, 0)
+	ids := make([]int, 0, len(posts))
 	for rows.Next() {
-		post := entity.Post{}
-		if err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
+		var id int
+		if err := rows.Scan(&id); err != nil {
 			log.Error(err)
 			return nil, err
 		}
-		posts = append(posts, post)
+		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
 		log.Error(err)
 		return nil, err
 	}
-
-	return &posts, nil
+	return &ids, nil
 }
+
+//const queryGetPosts = "SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts WHERE Created = $1::TIMESTAMP WITH TIME ZONE ORDER BY Id"
+//
+//func (store *Storage) GetPostsByCreated(tx *sql.Tx, created string) (*[]entity.Post, error) {
+//	rows, err := tx.Query(queryGetPosts, created)
+//	if err != nil {
+//		log.Error(err, "[created ", created, "]")
+//		return nil, err
+//	}
+//	defer rows.Close()
+//
+//	posts := make([]entity.Post, 0)
+//	for rows.Next() {
+//		post := entity.Post{}
+//		if err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
+//			log.Error(err)
+//			return nil, err
+//		}
+//		posts = append(posts, post)
+//	}
+//	if err := rows.Err(); err != nil {
+//		log.Error(err)
+//		return nil, err
+//	}
+//
+//	return &posts, nil
+//}
 
 const queryGetPostById = "SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts WHERE Id = $1"
 
-func (store *Storage) GetPostById(id int) (*entity.Post, error) {
-	row := store.DB.QueryRow(queryGetPostById, id)
+func (store *Storage) GetPostById(tx *sql.Tx, id int) (*entity.Post, error) {
+	row := tx.QueryRow(queryGetPostById, id)
 
 	var post entity.Post
 	if err := row.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
@@ -82,8 +97,8 @@ func (store *Storage) GetPostById(id int) (*entity.Post, error) {
 
 const queryUpdatePost = "UPDATE Posts SET Message = $2, IsEdited = true WHERE Id = $1"
 
-func (store *Storage) UpdatePost(id int, message string) error {
-	_, err := store.DB.Exec(queryUpdatePost, id, message)
+func (store *Storage) UpdatePost(tx *sql.Tx, id int, message string) error {
+	_, err := tx.Exec(queryUpdatePost, id, message)
 	return err
 }
 
@@ -111,22 +126,22 @@ ORDER BY Id DESC
 LIMIT $2
 `
 
-func (store *Storage) GetPostsByThreadFlat(thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
+func (store *Storage) GetPostsByThreadFlat(tx *sql.Tx, thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
 	var rows *sql.Rows
 	err := errors.New("undefined")
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsFlat, thread, limit)
+			rows, err = tx.Query(queryGetPostsFlat, thread, limit)
 		}
 		if order == "DESC" {
-			rows, err = store.DB.Query(queryGetPostsFlatDesc, thread, limit)
+			rows, err = tx.Query(queryGetPostsFlatDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsFlatSince, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsFlatSince, thread, limit, since)
 		}
 		if order == "DESC" {
-			rows, err = store.DB.Query(queryGetPostsFlatSinceDesc, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsFlatSinceDesc, thread, limit, since)
 		}
 	}
 
@@ -136,7 +151,7 @@ func (store *Storage) GetPostsByThreadFlat(thread int, limit int, since int, sor
 	}
 	defer rows.Close()
 
-	posts := make([]entity.Post, 0)
+	posts := make([]entity.Post, 0, 100)
 	for rows.Next() {
 		post := entity.Post{}
 		if err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
@@ -177,20 +192,20 @@ ORDER BY TreePath DESC
 LIMIT $2
 `
 
-func (store *Storage) GetPostsTree(thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
+func (store *Storage) GetPostsTree(tx *sql.Tx, thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
 	var rows *sql.Rows
 	err := errors.New("undefined")
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsTree, thread, limit)
+			rows, err = tx.Query(queryGetPostsTree, thread, limit)
 		} else {
-			rows, err = store.DB.Query(queryGetPostsTreeDesc, thread, limit)
+			rows, err = tx.Query(queryGetPostsTreeDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsTreeSince, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsTreeSince, thread, limit, since)
 		} else {
-			rows, err = store.DB.Query(queryGetPostsTreeSinceDesc, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsTreeSinceDesc, thread, limit, since)
 		}
 	}
 
@@ -217,41 +232,41 @@ func (store *Storage) GetPostsTree(thread int, limit int, since int, sort string
 }
 
 const queryGetPostsParentTree = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY Id LIMIT $2)
+WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY TreePath LIMIT $2)
 ORDER BY TreePath
 `
 const queryGetPostsParentTreeDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY Id DESC LIMIT $2)
+WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY TreePath DESC LIMIT $2)
 ORDER BY TreePath[1] DESC, TreePath
 `
 const queryGetPostsParentTreeSince = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
 WHERE TreePath[1] IN 
 (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 AND Id > (SELECT TreePath[1] FROM Posts WHERE Id = $3) 
-ORDER BY Id LIMIT $2)
+ORDER BY TreePath LIMIT $2)
 ORDER BY TreePath
 `
 const queryGetPostsParentTreeSinceDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
 WHERE TreePath[1] IN 
 (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 AND Id < (SELECT TreePath[1] FROM Posts WHERE Id = $3) 
-ORDER BY Id DESC LIMIT $2)
+ORDER BY TreePath DESC LIMIT $2)
 ORDER BY TreePath[1] DESC, TreePath
 `
 
-func (store *Storage) GetPostsParentTree(thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
+func (store *Storage) GetPostsParentTree(tx *sql.Tx, thread int, limit int, since int, sort string, order string) (*[]entity.Post, error) {
 	var rows *sql.Rows
 	err := errors.New("undefined")
 
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsParentTree, thread, limit)
+			rows, err = tx.Query(queryGetPostsParentTree, thread, limit)
 		} else {
-			rows, err = store.DB.Query(queryGetPostsParentTreeDesc, thread, limit)
+			rows, err = tx.Query(queryGetPostsParentTreeDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = store.DB.Query(queryGetPostsParentTreeSince, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsParentTreeSince, thread, limit, since)
 		} else {
-			rows, err = store.DB.Query(queryGetPostsParentTreeSinceDesc, thread, limit, since)
+			rows, err = tx.Query(queryGetPostsParentTreeSinceDesc, thread, limit, since)
 		}
 	}
 
@@ -280,70 +295,70 @@ func (store *Storage) GetPostsParentTree(thread int, limit int, since int, sort 
 	return &posts, nil
 }
 
-const queryGetPostsByParent = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE Parent = $1
-ORDER BY Id
-LIMIT $2
-`
-
-const queryGetPostsByParentDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE Parent = $1
-ORDER BY Id DESC
-LIMIT $2
-`
-
-func (store *Storage) GetPostsByParent(parent int, limit int, order string, since int, sinceFlag *bool) (*[]entity.Post, error) {
-	var rows *sql.Rows
-	err := errors.New("undefined")
-	if order == "ASC" {
-		rows, err = store.DB.Query(queryGetPostsByParent, parent, limit)
-	}
-	if order == "DESC" {
-		rows, err = store.DB.Query(queryGetPostsByParentDesc, parent, limit)
-	}
-	if err != nil {
-		log.Error(err, "[parent ", parent, "] [order ", order, "]", "[limit ", limit, "]")
-		return nil, err
-	}
-	defer rows.Close()
-
-	count := 0
-	posts := make([]entity.Post, 0)
-	for rows.Next() {
-		post := entity.Post{}
-		if err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
-			log.Error(err)
-			return nil, err
-		}
-		if *sinceFlag {
-			count++
-			posts = append(posts, post)
-		}
-
-		if post.Id == since {
-			*sinceFlag = true
-		}
-
-		childPosts, err := store.GetPostsByParent(post.Id, limit-count, order, since, sinceFlag)
-		if err != nil {
-			log.Error(err)
-			return nil, err
-		}
-
-		for _, childPost := range *childPosts {
-			if *sinceFlag {
-				posts = append(posts, childPost)
-				count++
-			}
-		}
-
-		if count >= limit {
-			break
-		}
-	}
-	if err := rows.Err(); err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return &posts, nil
-}
+//const queryGetPostsByParent = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
+//WHERE Parent = $1
+//ORDER BY Id
+//LIMIT $2
+//`
+//
+//const queryGetPostsByParentDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
+//WHERE Parent = $1
+//ORDER BY Id DESC
+//LIMIT $2
+//`
+//
+//func (store *Storage) GetPostsByParent(parent int, limit int, order string, since int, sinceFlag *bool) (*[]entity.Post, error) {
+//	var rows *sql.Rows
+//	err := errors.New("undefined")
+//	if order == "ASC" {
+//		rows, err = store.DB.Query(queryGetPostsByParent, parent, limit)
+//	}
+//	if order == "DESC" {
+//		rows, err = store.DB.Query(queryGetPostsByParentDesc, parent, limit)
+//	}
+//	if err != nil {
+//		log.Error(err, "[parent ", parent, "] [order ", order, "]", "[limit ", limit, "]")
+//		return nil, err
+//	}
+//	defer rows.Close()
+//
+//	count := 0
+//	posts := make([]entity.Post, 0)
+//	for rows.Next() {
+//		post := entity.Post{}
+//		if err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
+//			log.Error(err)
+//			return nil, err
+//		}
+//		if *sinceFlag {
+//			count++
+//			posts = append(posts, post)
+//		}
+//
+//		if post.Id == since {
+//			*sinceFlag = true
+//		}
+//
+//		childPosts, err := store.GetPostsByParent(post.Id, limit-count, order, since, sinceFlag)
+//		if err != nil {
+//			log.Error(err)
+//			return nil, err
+//		}
+//
+//		for _, childPost := range *childPosts {
+//			if *sinceFlag {
+//				posts = append(posts, childPost)
+//				count++
+//			}
+//		}
+//
+//		if count >= limit {
+//			break
+//		}
+//	}
+//	if err := rows.Err(); err != nil {
+//		log.Error(err)
+//		return nil, err
+//	}
+//	return &posts, nil
+//}

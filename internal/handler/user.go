@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"techpark_db/internal/domain/entity"
 )
@@ -22,15 +23,24 @@ func (h *Handler) UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.storage.FindUser(nickname, userReq.Email)
+	tx, err := h.storage.DB.Begin()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	users, err := h.storage.FindUser(tx, nickname, userReq.Email)
 	if err == nil && len(*users) > 0 {
+		tx.Rollback()
 		usersBytes, _ := json.Marshal(users)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(usersBytes)
 		return
 	}
 
-	if err := h.storage.SaveUser(userReq, nickname); err != nil {
+	if err := h.storage.SaveUser(tx, userReq, nickname); err != nil {
+		tx.Rollback()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -40,6 +50,12 @@ func (h *Handler) UserCreate(w http.ResponseWriter, r *http.Request) {
 		Fullname: userReq.Fullname,
 		About:    userReq.About,
 		Email:    userReq.Email,
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	forumBytes, _ := json.Marshal(user)
@@ -56,14 +72,28 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.storage.GetUser(nickname)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.storage.GetUser(tx, nickname)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoUser + nickname,
 		}
 		errorBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(errorBytes)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -88,8 +118,16 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.storage.GetUser(nickname)
+	tx, err := h.storage.DB.Begin()
 	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.storage.GetUser(tx, nickname)
+	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoUser + nickname,
 		}
@@ -109,8 +147,9 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		userReq.Email = user.Email
 	}
 
-	users, err := h.storage.FindUser(nickname, userReq.Email)
+	users, err := h.storage.FindUser(tx, nickname, userReq.Email)
 	if err == nil && len(*users) > 1 {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrEmailAlreadyRegistered + nickname,
 		}
@@ -120,7 +159,8 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.storage.UpdateUser(userReq, nickname); err != nil {
+	if err := h.storage.UpdateUser(tx, userReq, nickname); err != nil {
+		tx.Rollback()
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -130,6 +170,12 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		Fullname: userReq.Fullname,
 		About:    userReq.About,
 		Email:    userReq.Email,
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	userBytes, _ := json.Marshal(user)

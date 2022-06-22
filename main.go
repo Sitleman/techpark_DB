@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"techpark_db/internal/handler"
+	mw "techpark_db/internal/handler/middleware"
 	"techpark_db/internal/infra/psql"
 )
 
@@ -50,6 +51,8 @@ func main() {
 	/*====================== SERVICE ======================*/
 	routerAPI.HandleFunc("/service/status", handler.ServiceStatus).Methods("GET")
 	routerAPI.HandleFunc("/service/clear", handler.ServiceClear).Methods("POST")
+
+	routerAPI.Use(mw.TimeLogMiddleware)
 
 	log.Info("Start server at port 5000...")
 	if err := http.ListenAndServe(":5000", router); err != nil {
