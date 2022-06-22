@@ -3,11 +3,13 @@ package psql
 import (
 	"database/sql"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 const (
-	PG_HOST = "postgres"
-	//PG_HOST     = "localhost"
+	//PG_HOST = "postgres"
+	PG_HOST     = "localhost"
 	PG_PORT     = "5432"
 	PG_DBNAME   = "forum_db"
 	PG_USER     = "root"
@@ -23,10 +25,15 @@ func Connect() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(16)
 
-	if err := db.Ping(); err != nil {
-		return nil, err
+	for i := 0; i < 15; i++ {
+		err = db.Ping()
+		if err == nil {
+			return db, nil
+		}
+		log.Info("No connect: ", i)
+		time.Sleep(time.Second)
 	}
-	return db, nil
+	return nil, err
 }

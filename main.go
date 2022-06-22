@@ -31,10 +31,25 @@ func main() {
 	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/users", handler.ForumUsers).Methods("GET")
 	routerAPI.HandleFunc("/forum/{slug:[A-Za-z0-9._-]+}/threads", handler.ForumThreads).Methods("GET")
 
+	/*====================== THREAD ======================*/
+	routerAPI.HandleFunc("/thread/{slug_or_id:[A-Za-z0-9._-]+}/create", handler.ThreadCreatePosts).Methods("POST")
+	routerAPI.HandleFunc("/thread/{slug_or_id:[A-Za-z0-9._-]+}/vote", handler.ThreadVote).Methods("POST")
+	routerAPI.HandleFunc("/thread/{slug_or_id:[A-Za-z0-9._-]+}/details", handler.ThreadDetails).Methods("GET")
+	routerAPI.HandleFunc("/thread/{slug_or_id:[A-Za-z0-9._-]+}/details", handler.ThreadUpdate).Methods("POST")
+	routerAPI.HandleFunc("/thread/{slug_or_id:[A-Za-z0-9._-]+}/posts", handler.ThreadPosts).Methods("GET")
+
+	/*====================== POST ======================*/
+	routerAPI.HandleFunc("/post/{id:[0-9]+}/details", handler.PostGet).Methods("GET")
+	routerAPI.HandleFunc("/post/{id:[0-9]+}/details", handler.PostUpdate).Methods("POST")
+
 	/*====================== USER ======================*/
-	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9.]+}/create", handler.UserCreate).Methods("POST")
-	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9.]+}/profile", handler.UserDetails).Methods("GET")
-	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9.]+}/profile", handler.UserUpdate).Methods("POST")
+	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9._-]+}/create", handler.UserCreate).Methods("POST")
+	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9._-]+}/profile", handler.UserDetails).Methods("GET")
+	routerAPI.HandleFunc("/user/{nickname:[A-Za-z0-9._-]+}/profile", handler.UserUpdate).Methods("POST")
+
+	/*====================== SERVICE ======================*/
+	routerAPI.HandleFunc("/service/status", handler.ServiceStatus).Methods("GET")
+	routerAPI.HandleFunc("/service/clear", handler.ServiceClear).Methods("POST")
 
 	log.Info("Start server at port 5000...")
 	if err := http.ListenAndServe(":5000", router); err != nil {

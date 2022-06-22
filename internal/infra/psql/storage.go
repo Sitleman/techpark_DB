@@ -2,6 +2,8 @@ package psql
 
 import "database/sql"
 
+const INF = 10e7
+
 type Storage struct {
 	DB *sql.DB
 }

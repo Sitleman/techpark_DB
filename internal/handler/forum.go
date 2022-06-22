@@ -3,20 +3,12 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 	"techpark_db/internal/domain/entity"
 	"time"
 )
-
-const (
-	DEFAULT_ORDER    = "ASC"
-	DEFAULT_LIMIT    = 100
-	DEFAULT_SINCE_ID = 0
-)
-
-var DEFAULT_SINCE_DATA_MIN = time.Date(1000, 00, 0, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
-var DEFAULT_SINCE_DATA_MAX = time.Date(4000, 00, 0, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 
 func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
@@ -92,7 +84,7 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	vars := mux.Vars(r)
-	slug, ok := vars["slug"]
+	slugForum, ok := vars["slug"]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -105,13 +97,16 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.storage.GetUser(threadRequest.Author); err != nil {
-		ErrNoUserBytes, _ := json.Marshal(ErrNoUser)
+		resp := &entity.Error{
+			Message: ErrNoThreadAuthor + threadRequest.Author,
+		}
+		respBytes, _ := json.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
-		w.Write(ErrNoUserBytes)
+		w.Write(respBytes)
 		return
 	}
 
-	thread, err := h.storage.GetThreadByTitle(threadRequest.Title)
+	thread, err := h.storage.GetThread(threadRequest.Slug)
 	if err == nil {
 		threadBytes, _ := json.Marshal(thread)
 		w.WriteHeader(http.StatusConflict)
@@ -119,20 +114,31 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if threadRequest.Created == "" {
-		threadRequest.Created = time.Now().Format(time.RFC3339)
-	}
-
-	if err := h.storage.SaveThread(threadRequest, slug); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	forum, err := h.storage.GetForum(slugForum)
+	if err != nil {
+		resp := &entity.Error{
+			Message: ErrNoThreadForum + slugForum,
+		}
+		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(respBytes)
 		return
 	}
 
-	thread, err = h.storage.GetThreadByTitle(threadRequest.Title)
+	if threadRequest.Created == "" {
+		threadRequest.Created = time.Now().Format(time.RFC3339Nano)
+	}
+
+	insertId, err := h.storage.SaveThread(threadRequest, forum.Slug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
 
+	thread, err = h.storage.GetThreadById(insertId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	threadBytes, _ := json.Marshal(thread)
 	w.WriteHeader(http.StatusCreated)
@@ -150,26 +156,34 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 
 	order := DEFAULT_ORDER
 	limit := DEFAULT_LIMIT
-	since := DEFAULT_SINCE_ID
+	since := r.FormValue("since")
 	if r.FormValue("limit") != "" {
 		limit, _ = strconv.Atoi(r.FormValue("limit"))
 	}
 	if r.FormValue("desc") == "true" {
 		order = "DESC"
 	}
-	if r.FormValue("since") != "" {
-		since, _ = strconv.Atoi(r.FormValue("since"))
+
+	if _, err := h.storage.GetForum(slug); err != nil {
+		resp := &entity.Error{
+			Message: ErrNoForum + slug,
+		}
+		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(respBytes)
+		return
 	}
 
-	forum, err := h.storage.GetForumUsers(slug, order, limit, since)
+	users, err := h.storage.GetForumUsers(slug, order, limit, since)
 	if err != nil {
+		log.Warning("trouble GetForumUsers")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	forumBytes, _ := json.Marshal(forum)
+	usersBytes, _ := json.Marshal(users)
 	w.WriteHeader(http.StatusOK)
-	w.Write(forumBytes)
+	w.Write(usersBytes)
 }
 
 func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {

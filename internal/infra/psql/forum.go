@@ -21,7 +21,7 @@ func (store *Storage) GetForum(slug string) (*entity.Forum, error) {
 	row := store.DB.QueryRow(queryGetForum, slug)
 	forum := entity.Forum{}
 	if err := row.Scan(&forum.Slug, &forum.Title, &forum.User, &forum.Posts, &forum.Threads); err != nil {
-		log.Info(err, "[slug: ", slug, "]")
+		//log.Info(err, "[slug: ", slug, "]")
 		return nil, err
 	}
 	return &forum, nil
@@ -75,15 +75,65 @@ func (store *Storage) GetForumThreads(slug string, order string, limit int, sinc
 
 const queryGetForumUsers = `
 SELECT Nickname, Fullname, About, Email FROM Users
-JOIN Thread ON Users.Nickname = Thread.Author
-WHERE Forum = $1
-ORDER BY LOWER(Nickname) $2
-LIMIT $3
-OFFSET $4
+WHERE Nickname IN (
+    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+    UNION
+    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
+    )
+ORDER BY LOWER(Nickname)
+LIMIT $2
 `
 
-func (store *Storage) GetForumUsers(slug string, order string, limit int, since int) (*[]entity.User, error) {
-	rows, err := store.DB.Query(queryGetForumUsers, slug, order, limit, since)
+const queryGetForumUsersDesc = `
+SELECT Nickname, Fullname, About, Email FROM Users
+WHERE Nickname IN (
+    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+    UNION
+    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
+    )
+ORDER BY LOWER(Nickname) DESC
+LIMIT $2
+`
+
+const queryGetForumUsersSince = `
+SELECT Nickname, Fullname, About, Email FROM Users
+WHERE Nickname IN (
+    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+    UNION
+    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
+    ) AND LOWER(Nickname) > LOWER($3)
+ORDER BY LOWER(Nickname)
+LIMIT $2
+`
+
+const queryGetForumUsersSinceDesc = `
+SELECT Nickname, Fullname, About, Email FROM Users
+WHERE Nickname IN (
+    SELECT DISTINCT Author FROM Thread WHERE LOWER(Forum) = LOWER($1)
+    UNION
+    SELECT DISTINCT Author FROM Posts WHERE LOWER(Forum) = LOWER($1)
+    ) AND LOWER(Nickname) < LOWER($3)
+ORDER BY LOWER(Nickname) DESC
+LIMIT $2
+`
+
+func (store *Storage) GetForumUsers(slug string, order string, limit int, since string) (*[]entity.User, error) {
+	var rows *sql.Rows
+	var err error
+	if since == "" {
+		if order == "ASC" {
+			rows, err = store.DB.Query(queryGetForumUsers, slug, limit)
+		} else {
+			rows, err = store.DB.Query(queryGetForumUsersDesc, slug, limit)
+		}
+	} else {
+		if order == "ASC" {
+			rows, err = store.DB.Query(queryGetForumUsersSince, slug, limit, since)
+		} else {
+			rows, err = store.DB.Query(queryGetForumUsersSinceDesc, slug, limit, since)
+		}
+	}
+
 	if err != nil {
 		log.Error(err)
 		return nil, err
