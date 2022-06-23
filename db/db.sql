@@ -51,15 +51,15 @@ CREATE INDEX posts_select_parent_tree ON Posts ((TreePath[1]), TreePath);
 CREATE UNLOGGED TABLE Vote
 (
     IdThread     int               NOT NULL REFERENCES Thread(Id),
-    Nickname     citext             NOT NULL REFERENCES Users(Nickname),
+    Nickname     citext            NOT NULL REFERENCES Users(Nickname),
     Voice        int               NOT NULL DEFAULT 0,
     PRIMARY KEY(IdThread, Nickname)
 );
 
 CREATE UNLOGGED TABLE UsersForum
 (
-    Forum        citext           COLLATE "ucs_basic" NOT NULL REFERENCES Forum(Slug),
-    Nickname     citext            NOT NULL REFERENCES Users(Nickname),
+    Forum        citext   NOT NULL REFERENCES Forum(Slug),
+    Nickname     citext  COLLATE "ucs_basic" NOT NULL REFERENCES Users(Nickname),
     PRIMARY KEY(Forum, Nickname)
 );
 CREATE INDEX usersforum_nickname ON UsersForum using hash (Nickname);
