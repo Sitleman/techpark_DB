@@ -123,6 +123,7 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if postRequest.Message == "" || postRequest.Message == post.Message {
+		tx.Rollback()
 		postWithoutEdited := entity.PostWithoutEdited{
 			Id:      post.Id,
 			Parent:  post.Parent,

@@ -87,6 +87,7 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 
 	ids, err := h.storage.SavePosts(tx, postReq, thread.Forum, thread.Id, created)
 	if err != nil {
+		tx.Rollback()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -153,6 +154,7 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.storage.GetUser(tx, voteReq.Nickname)
 	if err != nil {
+		tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoUser + voteReq.Nickname,
 		}
@@ -271,6 +273,7 @@ func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.storage.UpdateThread(tx, *thread); err != nil {
+		tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -342,6 +345,7 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
+		tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	//PG_HOST = "postgres"
-	PG_HOST     = "localhost"
+	PG_HOST = "postgres"
+	//PG_HOST     = "localhost"
 	PG_PORT     = "5432"
 	PG_DBNAME   = "forum_db"
 	PG_USER     = "root"

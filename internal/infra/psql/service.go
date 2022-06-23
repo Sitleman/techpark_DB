@@ -36,32 +36,32 @@ func (store *Storage) GetServiceStatus(tx *sql.Tx) (*entity.ServStatus, error) {
 	return &servStatus, nil
 }
 
-const queryClearUsers = "DELETE FROM Users"
-const queryClearPosts = "DELETE FROM Posts"
-const queryClearThread = "DELETE FROM Thread"
-const queryClearForum = "DELETE FROM Forum"
-const queryClearVote = "DELETE FROM Vote"
+const queryClear = "TRUNCATE Vote, Posts, Thread, Forum, Users CASCADE"
+const queryClearPosts = "TRUNCATE TABLE Posts"
+const queryClearThread = "TRUNCATE TABLE Thread"
+const queryClearForum = "TRUNCATE TABLE Forum"
+const queryClearVote = "TRUNCATE TABLE Vote"
 
-func (store *Storage) ClearData(tx *sql.Tx) error {
-	if _, err := tx.Exec(queryClearVote); err != nil {
+func (store *Storage) ClearData() error {
+	if _, err := store.DB.Exec(queryClear); err != nil {
 		return err
 	}
-	log.Info("clear vote")
-	if _, err := tx.Exec(queryClearPosts); err != nil {
-		return err
-	}
-	log.Info("clear posts")
-	if _, err := tx.Exec(queryClearThread); err != nil {
-		return err
-	}
-	log.Info("clear thread")
-	if _, err := tx.Exec(queryClearForum); err != nil {
-		return err
-	}
-	log.Info("clear forum")
-	if _, err := tx.Exec(queryClearUsers); err != nil {
-		return err
-	}
-	log.Info("clear users")
+	log.Info("clear data")
+	//if _, err := tx.Exec(queryClearPosts); err != nil {
+	//	return err
+	//}
+	//log.Info("clear posts")
+	//if _, err := tx.Exec(queryClearThread); err != nil {
+	//	return err
+	//}
+	//log.Info("clear thread")
+	//if _, err := tx.Exec(queryClearForum); err != nil {
+	//	return err
+	//}
+	//log.Info("clear forum")
+	//if _, err := tx.Exec(queryClearUsers); err != nil {
+	//	return err
+	//}
+	//log.Info("clear users")
 	return nil
 }
