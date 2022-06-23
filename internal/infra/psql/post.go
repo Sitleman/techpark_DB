@@ -232,23 +232,23 @@ func (store *Storage) GetPostsTree(tx *sql.Tx, thread int, limit int, since int,
 }
 
 const queryGetPostsParentTree = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY TreePath LIMIT $2)
+WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY Id LIMIT $2)
 ORDER BY TreePath
 `
 const queryGetPostsParentTreeDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
-WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY TreePath DESC LIMIT $2)
+WHERE TreePath[1] IN (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 ORDER BY Id DESC LIMIT $2)
 ORDER BY TreePath[1] DESC, TreePath
 `
 const queryGetPostsParentTreeSince = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
 WHERE TreePath[1] IN 
 (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 AND Id > (SELECT TreePath[1] FROM Posts WHERE Id = $3) 
-ORDER BY TreePath LIMIT $2)
+ORDER BY Id LIMIT $2)
 ORDER BY TreePath
 `
 const queryGetPostsParentTreeSinceDesc = `SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts
 WHERE TreePath[1] IN 
 (SELECT Id FROM Posts WHERE Thread = $1 AND Parent = 0 AND Id < (SELECT TreePath[1] FROM Posts WHERE Id = $3) 
-ORDER BY TreePath DESC LIMIT $2)
+ORDER BY Id DESC LIMIT $2)
 ORDER BY TreePath[1] DESC, TreePath
 `
 

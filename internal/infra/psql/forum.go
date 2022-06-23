@@ -74,46 +74,34 @@ func (store *Storage) GetForumThreads(tx *sql.Tx, slug string, order string, lim
 }
 
 const queryGetForumUsers = `
-SELECT Nickname, Fullname, About, Email FROM Users AS u
-WHERE EXISTS (
-    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
-    UNION
-    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
-)
-ORDER BY Nickname
+SELECT Users.Nickname, Fullname, About, Email FROM Users
+JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1
+ORDER BY Users.Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersDesc = `
-SELECT Nickname, Fullname, About, Email FROM Users AS u
-WHERE EXISTS (
-    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
-    UNION
-    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
-)
-ORDER BY Nickname DESC
+SELECT Users.Nickname, Fullname, About, Email FROM Users
+JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1
+ORDER BY Users.Nickname DESC
 LIMIT $2
 `
 
 const queryGetForumUsersSince = `
-SELECT Nickname, Fullname, About, Email FROM Users AS u
-WHERE EXISTS (
-    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
-    UNION
-    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
-) AND Nickname > $3
-ORDER BY Nickname
+SELECT Users.Nickname, Fullname, About, Email FROM Users
+JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1 AND Users.Nickname > $3
+ORDER BY Users.Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersSinceDesc = `
-SELECT Nickname, Fullname, About, Email FROM Users AS u
-WHERE EXISTS (
-    SELECT DISTINCT 'ok' FROM Thread WHERE Forum = $1 AND Author = u.Nickname
-    UNION
-    SELECT DISTINCT 'ok' FROM Posts WHERE Forum = $1 AND Author = u.Nickname
-) AND Nickname < $3
-ORDER BY Nickname DESC
+SELECT Users.Nickname, Fullname, About, Email FROM Users
+JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1 AND Users.Nickname < $3
+ORDER BY Users.Nickname DESC
 LIMIT $2
 `
 
