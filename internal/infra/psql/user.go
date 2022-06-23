@@ -52,7 +52,7 @@ func (store *Storage) SaveUser(tx *sql.Tx, user entity.CreateUser, nickname stri
 	return nil
 }
 
-const queryUpdateUser = "UPDATE Users SET Fullname = $1, About = $2, Email = $3 WHERE LOWER(Nickname) = LOWER($4)"
+const queryUpdateUser = "UPDATE Users SET Fullname = $1, About = $2, Email = $3 WHERE Nickname = $4"
 
 func (store *Storage) UpdateUser(tx *sql.Tx, user entity.UpdateUser, nickname string) error {
 	if _, err := tx.Exec(queryUpdateUser, user.Fullname, user.About, user.Email, nickname); err != nil {

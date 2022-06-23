@@ -5,7 +5,7 @@ CREATE UNLOGGED TABLE Users
     Nickname    citext      COLLATE "ucs_basic"  NOT NULL PRIMARY KEY,
     Fullname    varchar(100)      NOT NULL,
     About       text              NOT NULL,
-    Email       citext      NOT NULL
+    Email       citext      NOT NULL UNIQUE
 );
 CREATE INDEX users_nickname ON Users using hash (Nickname);
 
@@ -30,6 +30,7 @@ CREATE UNLOGGED TABLE Thread
     Created      timestamp WITH TIME ZONE NOT NULL
 );
 CREATE INDEX thread_slug ON Thread using hash (Slug);
+CREATE INDEX forum_thread ON Thread (Forum, Created);
 
 CREATE UNLOGGED TABLE Posts
 (
@@ -60,6 +61,7 @@ CREATE UNLOGGED TABLE UsersForum
     Nickname     citext            NOT NULL REFERENCES Users(Nickname),
     PRIMARY KEY(Forum, Nickname)
 );
+CREATE INDEX usersforum_nickname ON UsersForum using hash (Nickname);
 
 -- INSERT INTO Users(Nickname, Fullname, About, Email)
 -- VALUES ('Test', 'NikitaGureev', 'About 1st user', 'test@mail.ru');

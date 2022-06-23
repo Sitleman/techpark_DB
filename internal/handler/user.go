@@ -161,7 +161,12 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.storage.UpdateUser(tx, userReq, nickname); err != nil {
 		tx.Rollback()
-		w.WriteHeader(http.StatusNotFound)
+		resp := &entity.Error{
+			Message: ErrEmailAlreadyRegistered + nickname,
+		}
+		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(http.StatusConflict)
+		w.Write(respBytes)
 		return
 	}
 

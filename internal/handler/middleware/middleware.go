@@ -11,6 +11,8 @@ func TimeLogMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		duration := time.Since(start).Microseconds()
-		fmt.Println(duration, " ", r.URL)
+		//if duration > 10000 {
+		fmt.Println(duration, " ", r.Method, " ", r.URL)
+		//}
 	})
 }

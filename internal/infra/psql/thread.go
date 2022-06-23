@@ -32,17 +32,20 @@ func (store *Storage) UpdateThread(tx *sql.Tx, thread entity.Thread) error {
 	return err
 }
 
-const queryGetThread = "SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread WHERE Slug = $1 OR Id = $2"
+const queryGetThreadId = "SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread WHERE Id = $1"
+const queryGetThreadSlug = "SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread WHERE Slug = $1"
 
 func (store *Storage) GetThread(tx *sql.Tx, slugOrId string) (*entity.Thread, error) {
 	if slugOrId == "" {
 		return nil, errors.New("Empty slug")
 	}
+	var row *sql.Row
 	id, err := strconv.Atoi(slugOrId)
 	if err != nil {
-		id = 0
+		row = tx.QueryRow(queryGetThreadSlug, slugOrId)
+	} else {
+		row = tx.QueryRow(queryGetThreadId, id)
 	}
-	row := tx.QueryRow(queryGetThread, slugOrId, id)
 	thread := entity.Thread{}
 	if err := row.Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created); err != nil {
 		return nil, err
