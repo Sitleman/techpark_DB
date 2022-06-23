@@ -221,6 +221,9 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts := r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	users, err := h.storage.GetForumUsers(tx, slug, order, limit, since)
 	if err != nil {
 		tx.Rollback()
@@ -228,6 +231,9 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	if len(*users) == 0 {
 		if _, err := h.storage.GetForum(tx, slug); err != nil {
@@ -241,6 +247,9 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	if err := tx.Commit(); err != nil {
 		log.Error(err)
@@ -276,6 +285,9 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		since = r.FormValue("since")
 	}
 
+	ts := r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	tx, err := h.storage.DB.Begin()
 	if err != nil {
 		log.Error(err)
@@ -283,12 +295,18 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	forum, err := h.storage.GetForumThreads(tx, slug, order, limit, since)
 	if err != nil {
 		tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	if len(*forum) == 0 {
 		if _, err := h.storage.GetForum(tx, slug); err != nil {
@@ -303,11 +321,17 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	if err := tx.Commit(); err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	forumBytes, _ := json.Marshal(forum)
 	w.WriteHeader(http.StatusOK)

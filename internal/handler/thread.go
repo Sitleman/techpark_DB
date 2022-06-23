@@ -209,6 +209,9 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts := r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	thread, err := h.storage.GetThread(tx, slug_or_id)
 	if err != nil {
 		tx.Rollback()
@@ -220,6 +223,9 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		w.Write(respBytes)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	if err := tx.Commit(); err != nil {
 		log.Error(err)
@@ -323,6 +329,9 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts := r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
 	thread, err := h.storage.GetThread(tx, slug_or_id)
 	if err != nil {
 		tx.Rollback()
@@ -334,6 +343,9 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		w.Write(respBytes)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	var posts *[]entity.Post
 	switch sort {
@@ -350,6 +362,9 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
 
 	if err := tx.Commit(); err != nil {
 		log.Error(err)

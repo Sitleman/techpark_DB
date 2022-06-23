@@ -9,7 +9,12 @@ import (
 const queryGetUser = "SELECT nickname, fullname, about, email FROM users WHERE nickname = $1"
 
 func (store *Storage) GetUser(tx *sql.Tx, nickname string) (*entity.User, error) {
-	row := tx.QueryRow(queryGetUser, nickname)
+	var row *sql.Row
+	if tx == nil {
+		row = store.DB.QueryRow(queryGetUser, nickname)
+	} else {
+		row = tx.QueryRow(queryGetUser, nickname)
+	}
 	user := entity.User{}
 	if err := row.Scan(&user.Nickname, &user.Fullname, &user.About, &user.Email); err != nil {
 		return nil, err

@@ -25,7 +25,8 @@ func Connect() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(16)
+	db.SetMaxOpenConns(150)
+	db.SetMaxIdleConns(50)
 
 	for i := 0; i < 15; i++ {
 		err = db.Ping()

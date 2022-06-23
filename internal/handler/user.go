@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"techpark_db/internal/domain/entity"
+	"time"
 )
 
 func (h *Handler) UserCreate(w http.ResponseWriter, r *http.Request) {
@@ -73,16 +74,19 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
-	user, err := h.storage.GetUser(tx, nickname)
+	ts := r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
+	user, err := h.storage.GetUser(nil, nickname)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoUser + nickname,
 		}
@@ -92,11 +96,14 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	ts = r.Context().Value("timestamp").(*[]time.Time)
+	*ts = append(*ts, time.Now())
+
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	userBytes, _ := easyjson.Marshal(user)
 	w.WriteHeader(http.StatusOK)
