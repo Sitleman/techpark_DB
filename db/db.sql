@@ -17,6 +17,7 @@ CREATE UNLOGGED TABLE Forum
     Posts        int              NOT NULL DEFAULT 0,
     Threads      int               NOT NULL DEFAULT 0
 );
+CREATE INDEX forum_slug ON Forum using hash (Slug);
 
 CREATE UNLOGGED TABLE Thread
 (
@@ -57,7 +58,7 @@ CREATE UNLOGGED TABLE Vote
 
 CREATE UNLOGGED TABLE UsersForum
 (
-    Forum        citext            NOT NULL REFERENCES Forum(Slug),
+    Forum        citext           COLLATE "ucs_basic" NOT NULL REFERENCES Forum(Slug),
     Nickname     citext            NOT NULL REFERENCES Users(Nickname),
     PRIMARY KEY(Forum, Nickname)
 );

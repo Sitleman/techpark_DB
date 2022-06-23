@@ -74,34 +74,34 @@ func (store *Storage) GetForumThreads(tx *sql.Tx, slug string, order string, lim
 }
 
 const queryGetForumUsers = `
-SELECT Users.Nickname, Fullname, About, Email FROM Users
-JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+SELECT UsersForum.Nickname, Fullname, About, Email FROM UsersForum
+JOIN Users ON Users.Nickname = UsersForum.Nickname
 WHERE Forum = $1
-ORDER BY Users.Nickname
+ORDER BY UsersForum.Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersDesc = `
-SELECT Users.Nickname, Fullname, About, Email FROM Users
-JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
+SELECT UsersForum.Nickname, Fullname, About, Email FROM UsersForum
+JOIN Users ON Users.Nickname = UsersForum.Nickname
 WHERE Forum = $1
-ORDER BY Users.Nickname DESC
+ORDER BY UsersForum.Nickname DESC
 LIMIT $2
 `
 
 const queryGetForumUsersSince = `
-SELECT Users.Nickname, Fullname, About, Email FROM Users
-JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
-WHERE Forum = $1 AND Users.Nickname > $3
-ORDER BY Users.Nickname
+SELECT UsersForum.Nickname, Fullname, About, Email FROM UsersForum
+JOIN Users ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1 AND UsersForum.Nickname > $3
+ORDER BY UsersForum.Nickname
 LIMIT $2
 `
 
 const queryGetForumUsersSinceDesc = `
-SELECT Users.Nickname, Fullname, About, Email FROM Users
-JOIN UsersForum ON Users.Nickname = UsersForum.Nickname
-WHERE Forum = $1 AND Users.Nickname < $3
-ORDER BY Users.Nickname DESC
+SELECT UsersForum.Nickname, Fullname, About, Email FROM UsersForum 
+JOIN Users ON Users.Nickname = UsersForum.Nickname
+WHERE Forum = $1 AND UsersForum.Nickname < $3
+ORDER BY UsersForum.Nickname DESC
 LIMIT $2
 `
 

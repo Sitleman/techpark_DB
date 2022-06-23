@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"techpark_db/internal/domain/entity"
@@ -58,7 +59,7 @@ func (h *Handler) UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forumBytes, _ := json.Marshal(user)
+	forumBytes, _ := easyjson.Marshal(user)
 	w.WriteHeader(http.StatusCreated)
 	w.Write(forumBytes)
 }
@@ -85,7 +86,7 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoUser + nickname,
 		}
-		errorBytes, _ := json.Marshal(resp)
+		errorBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(errorBytes)
 		return
@@ -97,7 +98,7 @@ func (h *Handler) UserDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userBytes, _ := json.Marshal(user)
+	userBytes, _ := easyjson.Marshal(user)
 	w.WriteHeader(http.StatusOK)
 	w.Write(userBytes)
 	return
@@ -131,7 +132,7 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoUser + nickname,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -153,7 +154,7 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrEmailAlreadyRegistered + nickname,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(respBytes)
 		return
@@ -164,7 +165,7 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrEmailAlreadyRegistered + nickname,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(respBytes)
 		return
@@ -183,7 +184,7 @@ func (h *Handler) UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userBytes, _ := json.Marshal(user)
+	userBytes, _ := easyjson.Marshal(user)
 	w.WriteHeader(http.StatusOK)
 	w.Write(userBytes)
 	return

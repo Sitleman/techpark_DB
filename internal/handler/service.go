@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
+	"github.com/mailru/easyjson"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 )
@@ -29,7 +29,7 @@ func (h *Handler) ServiceStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	servStatusBytes, _ := json.Marshal(servStatus)
+	servStatusBytes, _ := easyjson.Marshal(servStatus)
 	w.WriteHeader(http.StatusOK)
 	w.Write(servStatusBytes)
 }

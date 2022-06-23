@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -31,7 +32,7 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoUser + forumRequest.User,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -41,7 +42,7 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 	forum, err := h.storage.GetForum(tx, forumRequest.Slug)
 	if err == nil {
 		tx.Rollback()
-		forumBytes, _ := json.Marshal(forum)
+		forumBytes, _ := easyjson.Marshal(forum)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(forumBytes)
 		return
@@ -67,7 +68,7 @@ func (h *Handler) ForumCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forumBytes, _ := json.Marshal(forum)
+	forumBytes, _ := easyjson.Marshal(forum)
 	w.WriteHeader(http.StatusCreated)
 	w.Write(forumBytes)
 }
@@ -94,7 +95,7 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoForum + slug,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -106,7 +107,7 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forumBytes, _ := json.Marshal(forum)
+	forumBytes, _ := easyjson.Marshal(forum)
 	w.WriteHeader(http.StatusOK)
 	w.Write(forumBytes)
 }
@@ -138,7 +139,7 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThreadAuthor + threadRequest.Author,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -147,7 +148,7 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 	thread, err := h.storage.GetThread(tx, threadRequest.Slug)
 	if err == nil {
 		tx.Rollback()
-		threadBytes, _ := json.Marshal(thread)
+		threadBytes, _ := easyjson.Marshal(thread)
 		w.WriteHeader(http.StatusConflict)
 		w.Write(threadBytes)
 		return
@@ -159,7 +160,7 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThreadForum + slugForum,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -189,7 +190,7 @@ func (h *Handler) ForumCreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threadBytes, _ := json.Marshal(thread)
+	threadBytes, _ := easyjson.Marshal(thread)
 	w.WriteHeader(http.StatusCreated)
 	w.Write(threadBytes)
 }
@@ -220,23 +221,25 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.storage.GetForum(tx, slug); err != nil {
-		tx.Rollback()
-		resp := &entity.Error{
-			Message: ErrNoForum + slug,
-		}
-		respBytes, _ := json.Marshal(resp)
-		w.WriteHeader(http.StatusNotFound)
-		w.Write(respBytes)
-		return
-	}
-
 	users, err := h.storage.GetForumUsers(tx, slug, order, limit, since)
 	if err != nil {
 		tx.Rollback()
 		log.Warning("trouble GetForumUsers")
 		w.WriteHeader(http.StatusNotFound)
 		return
+	}
+
+	if len(*users) == 0 {
+		if _, err := h.storage.GetForum(tx, slug); err != nil {
+			tx.Rollback()
+			resp := &entity.Error{
+				Message: ErrNoForum + slug,
+			}
+			respBytes, _ := easyjson.Marshal(resp)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write(respBytes)
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -280,22 +283,24 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.storage.GetForum(tx, slug); err != nil {
-		tx.Rollback()
-		resp := &entity.Error{
-			Message: ErrNoForum + slug,
-		}
-		respBytes, _ := json.Marshal(resp)
-		w.WriteHeader(http.StatusNotFound)
-		w.Write(respBytes)
-		return
-	}
-
 	forum, err := h.storage.GetForumThreads(tx, slug, order, limit, since)
 	if err != nil {
 		tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	if len(*forum) == 0 {
+		if _, err := h.storage.GetForum(tx, slug); err != nil {
+			tx.Rollback()
+			resp := &entity.Error{
+				Message: ErrNoForum + slug,
+			}
+			respBytes, _ := easyjson.Marshal(resp)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write(respBytes)
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

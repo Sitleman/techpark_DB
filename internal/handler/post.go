@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -37,7 +38,7 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoPost + idRaw,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -81,7 +82,7 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	postDetailsBytes, _ := json.Marshal(postDetails)
+	postDetailsBytes, _ := easyjson.Marshal(postDetails)
 	w.WriteHeader(http.StatusOK)
 	w.Write(postDetailsBytes)
 }
@@ -116,7 +117,7 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoPost + idRaw,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -134,7 +135,7 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 			Created: post.Created,
 		}
 
-		postWithoutEditedBytes, _ := json.Marshal(postWithoutEdited)
+		postWithoutEditedBytes, _ := easyjson.Marshal(postWithoutEdited)
 		w.WriteHeader(http.StatusOK)
 		w.Write(postWithoutEditedBytes)
 		return
@@ -155,7 +156,7 @@ func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	postBytes, _ := json.Marshal(post)
+	postBytes, _ := easyjson.Marshal(post)
 	w.WriteHeader(http.StatusOK)
 	w.Write(postBytes)
 }

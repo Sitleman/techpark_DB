@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -38,7 +39,7 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -57,7 +58,7 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoPostAuthor + postReq[0].Author,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -75,7 +76,7 @@ func (h *Handler) ThreadCreatePosts(w http.ResponseWriter, r *http.Request) {
 			resp := &entity.Error{
 				Message: ErrNoThread + slug_or_id,
 			}
-			respBytes, _ := json.Marshal(resp)
+			respBytes, _ := easyjson.Marshal(resp)
 			w.WriteHeader(http.StatusConflict)
 			w.Write(respBytes)
 			return
@@ -145,7 +146,7 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -158,7 +159,7 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoUser + voteReq.Nickname,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -187,7 +188,7 @@ func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threadBytes, _ := json.Marshal(thread)
+	threadBytes, _ := easyjson.Marshal(thread)
 	w.WriteHeader(http.StatusOK)
 	w.Write(threadBytes)
 }
@@ -214,7 +215,7 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -226,7 +227,7 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threadBytes, _ := json.Marshal(thread)
+	threadBytes, _ := easyjson.Marshal(thread)
 	w.WriteHeader(http.StatusOK)
 	w.Write(threadBytes)
 }
@@ -259,7 +260,7 @@ func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
@@ -284,7 +285,7 @@ func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threadBytes, _ := json.Marshal(thread)
+	threadBytes, _ := easyjson.Marshal(thread)
 	w.WriteHeader(http.StatusOK)
 	w.Write(threadBytes)
 }
@@ -328,7 +329,7 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
-		respBytes, _ := json.Marshal(resp)
+		respBytes, _ := easyjson.Marshal(resp)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(respBytes)
 		return
