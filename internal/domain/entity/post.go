@@ -11,6 +11,9 @@ type Post struct {
 	Created  string `json:"created"`
 }
 
+//easyjson:json
+type Posts []Post
+
 type CreatePost struct {
 	Parent  int    `json:"parent"`
 	Author  string `json:"author"`

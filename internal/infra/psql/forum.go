@@ -18,7 +18,12 @@ func (store *Storage) SaveForum(tx *sql.Tx, forum entity.CreateForum) error {
 const queryGetForum = "SELECT Slug, Title, Nickname, Posts, Threads FROM Forum WHERE Slug = $1"
 
 func (store *Storage) GetForum(tx *sql.Tx, slug string) (*entity.Forum, error) {
-	row := tx.QueryRow(queryGetForum, slug)
+	var row *sql.Row
+	if row == nil {
+		row = store.DB.QueryRow(queryGetForum, slug)
+	} else {
+		row = tx.QueryRow(queryGetForum, slug)
+	}
 	forum := entity.Forum{}
 	if err := row.Scan(&forum.Slug, &forum.Title, &forum.User, &forum.Posts, &forum.Threads); err != nil {
 		//log.Info(err, "[slug: ", slug, "]")
@@ -45,9 +50,9 @@ func (store *Storage) GetForumThreads(tx *sql.Tx, slug string, order string, lim
 	var rows *sql.Rows
 	var err error
 	if order == "ASC" {
-		rows, err = tx.Query(queryGetForumThreads, slug, since, limit)
+		rows, err = store.DB.Query(queryGetForumThreads, slug, since, limit)
 	} else {
-		rows, err = tx.Query(queryGetForumThreadsDesc, slug, since, limit)
+		rows, err = store.DB.Query(queryGetForumThreadsDesc, slug, since, limit)
 	}
 
 	if err != nil {
@@ -110,15 +115,15 @@ func (store *Storage) GetForumUsers(tx *sql.Tx, slug string, order string, limit
 	var err error
 	if since == "" {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetForumUsers, slug, limit)
+			rows, err = store.DB.Query(queryGetForumUsers, slug, limit)
 		} else {
-			rows, err = tx.Query(queryGetForumUsersDesc, slug, limit)
+			rows, err = store.DB.Query(queryGetForumUsersDesc, slug, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetForumUsersSince, slug, limit, since)
+			rows, err = store.DB.Query(queryGetForumUsersSince, slug, limit, since)
 		} else {
-			rows, err = tx.Query(queryGetForumUsersSinceDesc, slug, limit, since)
+			rows, err = store.DB.Query(queryGetForumUsersSinceDesc, slug, limit, since)
 		}
 	}
 

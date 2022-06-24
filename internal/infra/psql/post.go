@@ -86,8 +86,12 @@ func (store *Storage) SavePosts(tx *sql.Tx, posts []entity.CreatePost, forum str
 const queryGetPostById = "SELECT Id, Parent, Author, Message, IsEdited, Forum, Thread, Created FROM Posts WHERE Id = $1"
 
 func (store *Storage) GetPostById(tx *sql.Tx, id int) (*entity.Post, error) {
-	row := tx.QueryRow(queryGetPostById, id)
-
+	var row *sql.Row
+	if tx != nil {
+		row = tx.QueryRow(queryGetPostById, id)
+	} else {
+		row = store.DB.QueryRow(queryGetPostById, id)
+	}
 	var post entity.Post
 	if err := row.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created); err != nil {
 		return nil, err
@@ -131,17 +135,17 @@ func (store *Storage) GetPostsByThreadFlat(tx *sql.Tx, thread int, limit int, si
 	err := errors.New("undefined")
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsFlat, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsFlat, thread, limit)
 		}
 		if order == "DESC" {
-			rows, err = tx.Query(queryGetPostsFlatDesc, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsFlatDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsFlatSince, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsFlatSince, thread, limit, since)
 		}
 		if order == "DESC" {
-			rows, err = tx.Query(queryGetPostsFlatSinceDesc, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsFlatSinceDesc, thread, limit, since)
 		}
 	}
 
@@ -197,15 +201,15 @@ func (store *Storage) GetPostsTree(tx *sql.Tx, thread int, limit int, since int,
 	err := errors.New("undefined")
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsTree, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsTree, thread, limit)
 		} else {
-			rows, err = tx.Query(queryGetPostsTreeDesc, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsTreeDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsTreeSince, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsTreeSince, thread, limit, since)
 		} else {
-			rows, err = tx.Query(queryGetPostsTreeSinceDesc, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsTreeSinceDesc, thread, limit, since)
 		}
 	}
 
@@ -258,15 +262,15 @@ func (store *Storage) GetPostsParentTree(tx *sql.Tx, thread int, limit int, sinc
 
 	if since == 0 {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsParentTree, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsParentTree, thread, limit)
 		} else {
-			rows, err = tx.Query(queryGetPostsParentTreeDesc, thread, limit)
+			rows, err = store.DB.Query(queryGetPostsParentTreeDesc, thread, limit)
 		}
 	} else {
 		if order == "ASC" {
-			rows, err = tx.Query(queryGetPostsParentTreeSince, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsParentTreeSince, thread, limit, since)
 		} else {
-			rows, err = tx.Query(queryGetPostsParentTreeSinceDesc, thread, limit, since)
+			rows, err = store.DB.Query(queryGetPostsParentTreeSinceDesc, thread, limit, since)
 		}
 	}
 

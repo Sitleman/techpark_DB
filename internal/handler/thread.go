@@ -202,19 +202,19 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	ts := r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	thread, err := h.storage.GetThread(tx, slug_or_id)
+	thread, err := h.storage.GetThread(nil, slug_or_id)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoThread + slug_or_id,
 		}
@@ -227,11 +227,11 @@ func (h *Handler) ThreadDetails(w http.ResponseWriter, r *http.Request) {
 	ts = r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	threadBytes, _ := easyjson.Marshal(thread)
 	w.WriteHeader(http.StatusOK)
@@ -322,57 +322,77 @@ func (h *Handler) ThreadPosts(w http.ResponseWriter, r *http.Request) {
 		order = "DESC"
 	}
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
-	ts := r.Context().Value("timestamp").(*[]time.Time)
-	*ts = append(*ts, time.Now())
+	//ts := r.Context().Value("timestamp").(*[]time.Time)
+	//*ts = append(*ts, time.Now())
 
-	thread, err := h.storage.GetThread(tx, slug_or_id)
+	id, err := strconv.Atoi(slug_or_id)
 	if err != nil {
-		tx.Rollback()
-		resp := &entity.Error{
-			Message: ErrNoThread + slug_or_id,
+		thread, err := h.storage.GetThread(nil, slug_or_id)
+		if err != nil {
+			//tx.Rollback()
+			resp := &entity.Error{
+				Message: ErrNoThread + slug_or_id,
+			}
+			respBytes, _ := easyjson.Marshal(resp)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write(respBytes)
+			return
 		}
-		respBytes, _ := easyjson.Marshal(resp)
-		w.WriteHeader(http.StatusNotFound)
-		w.Write(respBytes)
-		return
+		id = thread.Id
 	}
 
-	ts = r.Context().Value("timestamp").(*[]time.Time)
-	*ts = append(*ts, time.Now())
+	//ts = r.Context().Value("timestamp").(*[]time.Time)
+	//*ts = append(*ts, time.Now())
 
 	var posts *[]entity.Post
 	switch sort {
 	case "flat":
-		posts, err = h.storage.GetPostsByThreadFlat(tx, thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsByThreadFlat(nil, id, limit, since, sort, order)
 	case "tree":
-		posts, err = h.storage.GetPostsTree(tx, thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsTree(nil, id, limit, since, sort, order)
 	case "parent_tree":
-		posts, err = h.storage.GetPostsParentTree(tx, thread.Id, limit, since, sort, order)
+		posts, err = h.storage.GetPostsParentTree(nil, id, limit, since, sort, order)
 	}
 
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	ts = r.Context().Value("timestamp").(*[]time.Time)
-	*ts = append(*ts, time.Now())
-
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if len(*posts) == 0 {
+		if _, err := h.storage.GetThread(nil, slug_or_id); err != nil {
+			//tx.Rollback()
+			resp := &entity.Error{
+				Message: ErrNoThread + slug_or_id,
+			}
+			respBytes, _ := easyjson.Marshal(resp)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write(respBytes)
+			return
+		}
 	}
 
-	postsBytes, _ := json.Marshal(posts)
+	//ts = r.Context().Value("timestamp").(*[]time.Time)
+	//*ts = append(*ts, time.Now())
+
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+
+	var p entity.Posts
+	p = *posts
+	postsBytes, _ := easyjson.Marshal(p)
+	//postsBytes, _ := json.Marshal(posts)
 	w.WriteHeader(http.StatusOK)
 	w.Write(postsBytes)
 }

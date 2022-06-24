@@ -19,6 +19,9 @@ type Thread struct {
 	Created string `json:"created"`
 }
 
+//easyjson:json
+type Threads []Thread
+
 type ThreadResponse struct {
 	Id      int    `json:"id"`
 	Title   string `json:"title"`

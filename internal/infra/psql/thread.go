@@ -41,11 +41,21 @@ func (store *Storage) GetThread(tx *sql.Tx, slugOrId string) (*entity.Thread, er
 	}
 	var row *sql.Row
 	id, err := strconv.Atoi(slugOrId)
-	if err != nil {
-		row = tx.QueryRow(queryGetThreadSlug, slugOrId)
+
+	if tx != nil {
+		if err != nil {
+			row = tx.QueryRow(queryGetThreadSlug, slugOrId)
+		} else {
+			row = tx.QueryRow(queryGetThreadId, id)
+		}
 	} else {
-		row = tx.QueryRow(queryGetThreadId, id)
+		if err != nil {
+			row = store.DB.QueryRow(queryGetThreadSlug, slugOrId)
+		} else {
+			row = store.DB.QueryRow(queryGetThreadId, id)
+		}
 	}
+
 	thread := entity.Thread{}
 	if err := row.Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created); err != nil {
 		return nil, err
@@ -78,7 +88,12 @@ func (store *Storage) GetThreadByTitle(tx *sql.Tx, title string) (*entity.Thread
 const queryGetThreadByID = "SELECT Id, Title, Author, Forum, Message, Votes, Slug, Created FROM Thread WHERE Id = $1"
 
 func (store *Storage) GetThreadById(tx *sql.Tx, id int) (*entity.Thread, error) {
-	row := tx.QueryRow(queryGetThreadByID, id)
+	var row *sql.Row
+	if tx != nil {
+		row = tx.QueryRow(queryGetThreadByID, id)
+	} else {
+		row = store.DB.QueryRow(queryGetThreadByID, id)
+	}
 	thread := entity.Thread{}
 	if err := row.Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created); err != nil {
 		return nil, err

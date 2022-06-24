@@ -82,16 +82,16 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
-	forum, err := h.storage.GetForum(tx, slug)
+	forum, err := h.storage.GetForum(nil, slug)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoForum + slug,
 		}
@@ -101,11 +101,11 @@ func (h *Handler) ForumDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	forumBytes, _ := easyjson.Marshal(forum)
 	w.WriteHeader(http.StatusOK)
@@ -214,19 +214,19 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 		order = "DESC"
 	}
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	ts := r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	users, err := h.storage.GetForumUsers(tx, slug, order, limit, since)
+	users, err := h.storage.GetForumUsers(nil, slug, order, limit, since)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		log.Warning("trouble GetForumUsers")
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -236,8 +236,8 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 	*ts = append(*ts, time.Now())
 
 	if len(*users) == 0 {
-		if _, err := h.storage.GetForum(tx, slug); err != nil {
-			tx.Rollback()
+		if _, err := h.storage.GetForum(nil, slug); err != nil {
+			//tx.Rollback()
 			resp := &entity.Error{
 				Message: ErrNoForum + slug,
 			}
@@ -251,13 +251,15 @@ func (h *Handler) ForumUsers(w http.ResponseWriter, r *http.Request) {
 	ts = r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
-	usersBytes, _ := json.Marshal(users)
+	var u entity.Users
+	u = *users
+	usersBytes, _ := easyjson.Marshal(u)
 	w.WriteHeader(http.StatusOK)
 	w.Write(usersBytes)
 }
@@ -288,19 +290,19 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 	ts := r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	ts = r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	forum, err := h.storage.GetForumThreads(tx, slug, order, limit, since)
+	forum, err := h.storage.GetForumThreads(nil, slug, order, limit, since)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -309,8 +311,8 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 	*ts = append(*ts, time.Now())
 
 	if len(*forum) == 0 {
-		if _, err := h.storage.GetForum(tx, slug); err != nil {
-			tx.Rollback()
+		if _, err := h.storage.GetForum(nil, slug); err != nil {
+			//tx.Rollback()
 			resp := &entity.Error{
 				Message: ErrNoForum + slug,
 			}
@@ -324,16 +326,18 @@ func (h *Handler) ForumThreads(w http.ResponseWriter, r *http.Request) {
 	ts = r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	ts = r.Context().Value("timestamp").(*[]time.Time)
 	*ts = append(*ts, time.Now())
 
-	forumBytes, _ := json.Marshal(forum)
+	var f entity.Threads
+	f = *forum
+	forumBytes, _ := easyjson.Marshal(f)
 	w.WriteHeader(http.StatusOK)
 	w.Write(forumBytes)
 }

@@ -24,17 +24,17 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 	args := strings.Split(argsRaw, ",")
 	//log.Info(args, "///", argsRaw, "///")
 
-	tx, err := h.storage.DB.Begin()
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//tx, err := h.storage.DB.Begin()
+	//if err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	id, _ := strconv.Atoi(idRaw)
-	post, err := h.storage.GetPostById(tx, id)
+	post, err := h.storage.GetPostById(nil, id)
 	if err != nil {
-		tx.Rollback()
+		//tx.Rollback()
 		resp := &entity.Error{
 			Message: ErrNoPost + idRaw,
 		}
@@ -50,25 +50,25 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 	for _, arg := range args {
 		switch arg {
 		case "user":
-			author, err := h.storage.GetUser(tx, post.Author)
+			author, err := h.storage.GetUser(nil, post.Author)
 			if err != nil {
-				tx.Rollback()
+				//tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			postDetails.DAuthor = author
 		case "forum":
-			forum, err := h.storage.GetForum(tx, post.Forum)
+			forum, err := h.storage.GetForum(nil, post.Forum)
 			if err != nil {
-				tx.Rollback()
+				//tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			postDetails.DForum = forum
 		case "thread":
-			thread, err := h.storage.GetThreadById(tx, post.Thread)
+			thread, err := h.storage.GetThreadById(nil, post.Thread)
 			if err != nil {
-				tx.Rollback()
+				//tx.Rollback()
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -76,11 +76,11 @@ func (h *Handler) PostGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	//if err := tx.Commit(); err != nil {
+	//	log.Error(err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	postDetailsBytes, _ := easyjson.Marshal(postDetails)
 	w.WriteHeader(http.StatusOK)
